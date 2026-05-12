@@ -6,7 +6,7 @@ import { errorHandler } from './middlewares/errorHandler'
 const app = new Hono()
 
 app.use('*', logger())
-app.get('/health', (c) => c.json({ status: 'ok' }))
+app.get('/health', (c) => c.json({ status: 'ok', scope: 'public' }))
 app.route('/api', routes)
 
 app.onError(errorHandler)
