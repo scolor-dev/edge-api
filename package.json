@@ -18,6 +18,7 @@
     "d1:create": "wrangler d1 create",
     "d1:migrate": "wrangler d1 migrations apply",
     "d1:query": "wrangler d1 execute",
+    "d1:delete": "wrangler d1 delete",
 
     "kv:list": "wrangler kv namespace list",
     "kv:create": "wrangler kv namespace create",

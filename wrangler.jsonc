@@ -5,24 +5,19 @@
 	"compatibility_date": "2026-05-09",
 	"r2_buckets": [
 		{
-			"binding": "SCD_BUCKET",
-			"bucket_name": "scd-bucket"
+			"bucket_name": "scd-assets",
+			"binding": "SCD_ASSETS"
 		},
 		{
-			"bucket_name": "scd-bucket",
-			"binding": "scd_bucket"
+			"bucket_name": "scd-contents",
+			"binding": "SCD_CONTENTS"
 		}
 	],
 	"d1_databases": [
 		{
 			"binding": "SCD_DB",
 			"database_name": "scd-db",
-			"database_id": "placeholder"
-		},
-		{
-			"binding": "scd_db",
-			"database_name": "scd-db",
-			"database_id": "6d9c7842-d119-47a3-af05-6d85f9afa4a4"
+			"database_id": "d9d81f78-3283-4cca-bb65-9561cc92e20f"
 		}
 	],
 	"observability": {
