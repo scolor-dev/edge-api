@@ -3,7 +3,7 @@ import { logger } from 'hono/logger'
 import routes from './routes'
 import { errorHandler } from './middlewares/errorHandler'
 
-const app = new Hono()
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 app.use('*', logger())
 app.get('/health', (c) => c.json({ status: 'ok', scope: 'public' }))
