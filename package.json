@@ -1,5 +1,5 @@
 {
-  "name": "edge-api",
+  "name": "portfolio-api",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "edge-api",
+	"name": "portfolio-api",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-05-09",
 	"r2_buckets": [
@@ -24,4 +24,7 @@
 		"enabled": true,
 		"head_sampling_rate": 1
 	},
+	"vars": {
+		"ALLOWED_ORIGIN": "https://scolor-dev.work, https://admin.scolor-dev.work"
+	}
 }
