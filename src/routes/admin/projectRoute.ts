@@ -1,10 +1,10 @@
 import { Hono, type Context } from 'hono'
-import { projectService, type ProjectQuery } from '../../services/projects'
+import { projectService, type ProjectQuery, type FolderStructure } from '../../services/projects'
 import { NotFoundError } from '../../lib/errors'
 
 const adminProjectRoute = new Hono<{ Bindings: CloudflareBindings }>()
 
-// プロジェクト一覧
+// プロジェクト一覧（adminはstatus絞り込み可）
 adminProjectRoute.get('/', async (c) => {
   const query = parseProjectQuery(c)
   return c.json(await projectService.getAll(c.env.SCD_DB, query))
@@ -43,7 +43,7 @@ adminProjectRoute.delete('/:slug', async (c) => {
 // フォルダ構造更新
 adminProjectRoute.put('/:slug/folders', async (c) => {
   const slug = c.req.param('slug')
-  const body = await c.req.json()
+  const body = await c.req.json<FolderStructure>()
   await projectService.updateFolders(c.env.SCD_CONTENTS, slug, body)
   return c.json({ success: true })
 })
@@ -53,7 +53,7 @@ adminProjectRoute.put('/:slug/files/*', async (c) => {
   const slug = c.req.param('slug')
   const path = c.req.param('*')
   if (!path) throw new NotFoundError()
-  const body = await c.req.json()
+  const body = await c.req.json<{ content: string }>()
   await projectService.uploadFile(c.env.SCD_CONTENTS, slug, path, body.content)
   return c.json({ success: true })
 })
@@ -70,7 +70,7 @@ adminProjectRoute.delete('/:slug/files/*', async (c) => {
 // タグ一括更新
 adminProjectRoute.put('/:slug/tags', async (c) => {
   const slug = c.req.param('slug')
-  const body = await c.req.json()
+  const body = await c.req.json<{ tagIds: string[] }>()
   await projectService.setTags(c.env.SCD_DB, slug, body.tagIds)
   return c.json({ success: true })
 })
@@ -91,7 +91,6 @@ adminProjectRoute.delete('/:slug/tags/:tagId', async (c) => {
   return c.json({ success: true })
 })
 
-// クエリパラメータのパース（adminはstatusも対応）
 function parseProjectQuery(c: Context<{ Bindings: CloudflareBindings }>): ProjectQuery {
   return {
     q: c.req.query('q'),

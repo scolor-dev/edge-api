@@ -10,7 +10,7 @@ projectRoute.get('/', async (c) => {
   return c.json(await projectService.getAll(c.env.SCD_DB, query))
 })
 
-// プロジェクト個別（index.md + index.json）
+// プロジェクト個別（README.md + index.json）
 projectRoute.get('/:slug', async (c) => {
   const slug = c.req.param('slug')
   const result = await projectService.getBySlug(c.env.SCD_DB, c.env.SCD_CONTENTS, slug)
@@ -18,7 +18,7 @@ projectRoute.get('/:slug', async (c) => {
   return c.json(result)
 })
 
-// フォルダ内のindex.json取得
+// フォルダ構造取得
 projectRoute.get('/:slug/folders', async (c) => {
   const slug = c.req.param('slug')
   const result = await projectService.getFolders(c.env.SCD_CONTENTS, slug)
@@ -36,7 +36,6 @@ projectRoute.get('/:slug/files/*', async (c) => {
   return c.json(result)
 })
 
-// クエリパラメータのパース
 function parseProjectQuery(c: Context<{ Bindings: CloudflareBindings }>): ProjectQuery {
   return {
     q: c.req.query('q'),

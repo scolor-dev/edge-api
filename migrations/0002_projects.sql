@@ -5,7 +5,6 @@ CREATE TABLE projects (
   slug        TEXT NOT NULL UNIQUE,
   description TEXT,
   links       TEXT,
-  index_path  TEXT,
   keywords    TEXT,
   date        TEXT,
   status      TEXT NOT NULL DEFAULT 'draft',

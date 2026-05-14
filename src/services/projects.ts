@@ -1,5 +1,3 @@
-// src/services/projects.ts
-
 import { projectRepository } from '../repositories/projects'
 import { storage } from '../lib/storage'
 import { NotFoundError } from '../lib/errors'
@@ -29,6 +27,11 @@ export interface CreateProjectInput {
 
 export interface UpdateProjectInput extends Partial<CreateProjectInput> {}
 
+export interface FolderStructure {
+  folders: { name: string; path: string; order: number }[]
+  files: { name: string; path: string; order: number }[]
+}
+
 export const projectService = {
   // ===========================
   // public
@@ -45,24 +48,21 @@ export const projectService = {
   /**
    * プロジェクト個別取得
    * - D1: projects + tags をJOIN
-   * - R2(SCD_CONTENTS): {slug}/index.md を取得
+   * - R2(SCD_CONTENTS): {slug}/README.md を取得
    * - R2(SCD_CONTENTS): {slug}/index.json を取得（type === 'docs'のみ）
    */
   async getBySlug(db: D1Database, bucket: R2Bucket, slug: string) {
     const project = await projectRepository.getBySlug(db, slug)
     if (!project) return null
 
-    const content = project.index_path
-      ? await storage.getText(bucket, project.index_path)
-      : null
+    const readme = await storage.getText(bucket, `${slug}/README.md`)
 
     let folders = null
     if (project.type === 'docs') {
-      const json = await storage.getText(bucket, `${slug}/index.json`)
-      folders = json ? JSON.parse(json) : null
+      folders = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
     }
 
-    return { ...project, content, folders }
+    return { ...project, readme, folders }
   },
 
   /**
@@ -70,9 +70,7 @@ export const projectService = {
    * - R2(SCD_CONTENTS): {slug}/index.json を取得してパース
    */
   async getFolders(bucket: R2Bucket, slug: string) {
-    const json = await storage.getText(bucket, `${slug}/index.json`)
-    if (!json) return null
-    return JSON.parse(json)
+    return await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
   },
 
   /**
@@ -91,21 +89,19 @@ export const projectService = {
    * プロジェクト作成
    * - D1: projects にINSERT
    * - D1: project_tags にINSERT（tagIdsがある場合）
-   * - R2(SCD_CONTENTS): {slug}/index.md をPUT（contentがある場合）
+   * - R2(SCD_CONTENTS): {slug}/README.md をPUT（contentがある場合）
    * - R2(SCD_CONTENTS): {slug}/index.json をPUT（type === 'docs'の場合）
    */
   async create(db: D1Database, bucket: R2Bucket, data: CreateProjectInput): Promise<{ id: string }> {
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
 
-    let index_path: string | null = null
     if (data.content) {
-      index_path = `${data.slug}/index.md`
-      await storage.put(bucket, index_path, data.content)
+      await storage.putText(bucket, `${data.slug}/README.md`, data.content)
     }
 
     if (data.type === 'docs') {
-      await storage.put(bucket, `${data.slug}/index.json`, JSON.stringify({ folders: [], files: [] }))
+      await storage.putJson(bucket, `${data.slug}/index.json`, { folders: [], files: [] })
     }
 
     await projectRepository.create(db, {
@@ -115,7 +111,6 @@ export const projectService = {
       slug: data.slug,
       description: data.description ?? null,
       links: data.links ?? null,
-      index_path,
       keywords: data.keywords ?? null,
       date: data.date ?? now,
       status: data.status ?? 'draft',
@@ -132,7 +127,7 @@ export const projectService = {
    * プロジェクト更新
    * - D1: projects をUPDATE
    * - D1: project_tags を一括更新（tagIdsがある場合）
-   * - R2(SCD_CONTENTS): index.md をPUT（contentがある場合）
+   * - R2(SCD_CONTENTS): README.md をPUT（contentがある場合）
    * - R2(SCD_CONTENTS): slug変更時に旧パスのファイルを新パスに移動・旧ファイル削除
    */
   async update(db: D1Database, bucket: R2Bucket, slug: string, data: UpdateProjectInput): Promise<void> {
@@ -140,26 +135,21 @@ export const projectService = {
     if (!project) throw new NotFoundError()
 
     const newSlug = data.slug ?? slug
-    let index_path = project.index_path
 
     // slug変更時にR2のファイルを移動
     if (data.slug && data.slug !== slug) {
-      // index.mdの移動
-      if (project.index_path) {
-        const oldContent = await storage.getText(bucket, project.index_path)
-        if (oldContent) {
-          const newPath = `${newSlug}/index.md`
-          await storage.put(bucket, newPath, oldContent)
-          await storage.delete(bucket, project.index_path)
-          index_path = newPath
-        }
+      // README.mdの移動
+      const oldReadme = await storage.getText(bucket, `${slug}/README.md`)
+      if (oldReadme) {
+        await storage.putText(bucket, `${newSlug}/README.md`, oldReadme)
+        await storage.delete(bucket, `${slug}/README.md`)
       }
 
       // docsの場合はindex.jsonも移動
       if (project.type === 'docs') {
-        const oldJson = await storage.getText(bucket, `${slug}/index.json`)
+        const oldJson = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
         if (oldJson) {
-          await storage.put(bucket, `${newSlug}/index.json`, oldJson)
+          await storage.putJson(bucket, `${newSlug}/index.json`, oldJson)
           await storage.delete(bucket, `${slug}/index.json`)
         }
       }
@@ -167,14 +157,14 @@ export const projectService = {
 
     // contentが更新された場合
     if (data.content) {
-      index_path = `${newSlug}/index.md`
-      await storage.put(bucket, index_path, data.content)
+      await storage.putText(bucket, `${newSlug}/README.md`, data.content)
     }
 
-    await projectRepository.update(db, project.id, { ...data, index_path })
+    const { content, tagIds, ...rest } = data
+    await projectRepository.update(db, project.id, rest)
 
-    if (data.tagIds) {
-      await projectRepository.setTags(db, project.id, data.tagIds)
+    if (tagIds) {
+      await projectRepository.setTags(db, project.id, tagIds)
     }
   },
 
@@ -195,8 +185,8 @@ export const projectService = {
    * フォルダ構造更新
    * - R2(SCD_CONTENTS): {slug}/index.json をPUT
    */
-  async updateFolders(bucket: R2Bucket, slug: string, data: unknown): Promise<void> {
-    await storage.put(bucket, `${slug}/index.json`, JSON.stringify(data))
+  async updateFolders(bucket: R2Bucket, slug: string, data: FolderStructure): Promise<void> {
+    await storage.putJson(bucket, `${slug}/index.json`, data)
   },
 
   /**
@@ -204,7 +194,7 @@ export const projectService = {
    * - R2(SCD_CONTENTS): {slug}/{path} にMDをPUT
    */
   async uploadFile(bucket: R2Bucket, slug: string, path: string, content: string): Promise<void> {
-    await storage.put(bucket, `${slug}/${path}`, content)
+    await storage.putText(bucket, `${slug}/${path}`, content)
   },
 
   /**

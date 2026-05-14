@@ -1,5 +1,3 @@
-// src/repositories/projects.ts
-
 import type { ProjectQuery } from '../services/projects'
 
 export interface Project {
@@ -9,7 +7,6 @@ export interface Project {
   slug: string
   description: string | null
   links: string | null
-  index_path: string | null
   keywords: string | null
   date: string | null
   status: 'published' | 'draft' | 'private' | 'archived'
@@ -31,7 +28,6 @@ export const projectRepository = {
     const conditions: string[] = []
     const bindings: unknown[] = []
 
-    // statusの絞り込み（adminはany、publicはpublishedのみ）
     if (query.status) {
       conditions.push('p.status = ?')
       bindings.push(query.status)
@@ -40,7 +36,6 @@ export const projectRepository = {
       bindings.push('published')
     }
 
-    // テキスト検索
     if (query.q) {
       if (query.q_match === 'exact') {
         conditions.push('(p.title = ? OR p.description = ?)')
@@ -51,10 +46,8 @@ export const projectRepository = {
       }
     }
 
-    // タグ絞り込み
     if (query.tags && query.tags.length > 0) {
       if (query.tag_match === 'exact') {
-        // 完全一致：指定タグを全部持つ
         query.tags.forEach(tag => {
           conditions.push(`
             EXISTS (
@@ -66,7 +59,6 @@ export const projectRepository = {
           bindings.push(tag)
         })
       } else {
-        // 部分一致：指定タグのいずれかを持つ
         conditions.push(`
           EXISTS (
             SELECT 1 FROM project_tags pt2
@@ -79,7 +71,6 @@ export const projectRepository = {
       }
     }
 
-    // 日付範囲
     if (query.date_from) {
       conditions.push('p.date >= ?')
       bindings.push(query.date_from)
@@ -156,12 +147,12 @@ export const projectRepository = {
     const now = new Date().toISOString()
     await db
       .prepare(`
-        INSERT INTO projects (id, type, title, slug, description, links, index_path, keywords, date, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO projects (id, type, title, slug, description, links, keywords, date, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .bind(
         data.id, data.type, data.title, data.slug,
-        data.description, data.links, data.index_path,
+        data.description, data.links,
         data.keywords, data.date, data.status, now, now
       )
       .run()
@@ -176,12 +167,12 @@ export const projectRepository = {
       .prepare(`
         UPDATE projects
         SET type = ?, title = ?, slug = ?, description = ?, links = ?,
-            index_path = ?, keywords = ?, date = ?, status = ?, updated_at = ?
+            keywords = ?, date = ?, status = ?, updated_at = ?
         WHERE id = ?
       `)
       .bind(
         data.type, data.title, data.slug, data.description,
-        data.links, data.index_path, data.keywords,
+        data.links, data.keywords,
         data.date, data.status, new Date().toISOString(), id
       )
       .run()
