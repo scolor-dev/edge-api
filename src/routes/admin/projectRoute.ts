@@ -48,6 +48,16 @@ adminProjectRoute.put('/:slug/folders', async (c) => {
   return c.json({ success: true })
 })
 
+// フォルダ移動
+adminProjectRoute.patch('/:slug/folders/*', async (c) => {
+  const slug = c.req.param('slug')
+  const oldPath = c.req.param('*')
+  if (!oldPath) throw new NotFoundError()
+  const body = await c.req.json<{ new_path: string }>()
+  await projectService.moveFolder(c.env.SCD_CONTENTS, slug, oldPath, body.new_path)
+  return c.json({ success: true })
+})
+
 // ファイルアップロード
 adminProjectRoute.put('/:slug/files/*', async (c) => {
   const slug = c.req.param('slug')
@@ -55,6 +65,16 @@ adminProjectRoute.put('/:slug/files/*', async (c) => {
   if (!path) throw new NotFoundError()
   const body = await c.req.json<{ content: string }>()
   await projectService.uploadFile(c.env.SCD_CONTENTS, slug, path, body.content)
+  return c.json({ success: true })
+})
+
+// ファイル移動
+adminProjectRoute.patch('/:slug/files/*', async (c) => {
+  const slug = c.req.param('slug')
+  const oldPath = c.req.param('*')
+  if (!oldPath) throw new NotFoundError()
+  const body = await c.req.json<{ new_path: string }>()
+  await projectService.moveFile(c.env.SCD_CONTENTS, slug, oldPath, body.new_path)
   return c.json({ success: true })
 })
 

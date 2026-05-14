@@ -128,7 +128,7 @@ export const projectService = {
    * - D1: projects をUPDATE
    * - D1: project_tags を一括更新（tagIdsがある場合）
    * - R2(SCD_CONTENTS): README.md をPUT（contentがある場合）
-   * - R2(SCD_CONTENTS): slug変更時に旧パスのファイルを新パスに移動・旧ファイル削除
+   * - R2(SCD_CONTENTS): slug変更時にsimpleはREADME.mdのみ移動、docsは配下を全移動
    */
   async update(db: D1Database, bucket: R2Bucket, slug: string, data: UpdateProjectInput): Promise<void> {
     const project = await projectRepository.getBySlug(db, slug)
@@ -138,20 +138,17 @@ export const projectService = {
 
     // slug変更時にR2のファイルを移動
     if (data.slug && data.slug !== slug) {
-      // README.mdの移動
-      const oldReadme = await storage.getText(bucket, `${slug}/README.md`)
-      if (oldReadme) {
-        await storage.putText(bucket, `${newSlug}/README.md`, oldReadme)
-        await storage.delete(bucket, `${slug}/README.md`)
-      }
-
-      // docsの場合はindex.jsonも移動
-      if (project.type === 'docs') {
-        const oldJson = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-        if (oldJson) {
-          await storage.putJson(bucket, `${newSlug}/index.json`, oldJson)
-          await storage.delete(bucket, `${slug}/index.json`)
+      if (project.type === 'simple') {
+        // README.mdのみ移動
+        const oldReadme = await storage.getText(bucket, `${slug}/README.md`)
+        if (oldReadme) {
+          await storage.putText(bucket, `${newSlug}/README.md`, oldReadme)
+          await storage.delete(bucket, `${slug}/README.md`)
         }
+      } else {
+        // docs：配下を全コピー→全削除
+        await storage.copyAll(bucket, `${slug}/`, `${newSlug}/`)
+        await storage.deleteAll(bucket, `${slug}/`)
       }
     }
 
@@ -198,11 +195,68 @@ export const projectService = {
   },
 
   /**
+   * ファイル移動
+   * - R2(SCD_CONTENTS): 旧パスをコピー→削除
+   * - R2(SCD_CONTENTS): index.jsonのpath更新
+   */
+  async moveFile(bucket: R2Bucket, slug: string, oldPath: string, newPath: string): Promise<void> {
+    const content = await storage.getText(bucket, `${slug}/${oldPath}`)
+    if (!content) throw new NotFoundError()
+
+    await storage.putText(bucket, `${slug}/${newPath}`, content)
+    await storage.delete(bucket, `${slug}/${oldPath}`)
+
+    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
+    if (structure) {
+      structure.files = structure.files.map(f =>
+        f.path === oldPath
+          ? { ...f, path: newPath, name: newPath.split('/').pop() ?? f.name }
+          : f
+      )
+      await storage.putJson(bucket, `${slug}/index.json`, structure)
+    }
+  },
+
+  /**
+   * フォルダ移動
+   * - R2(SCD_CONTENTS): 旧プレフィックス配下を全コピー→全削除
+   * - R2(SCD_CONTENTS): index.jsonのフォルダ・ファイルのpath更新
+   */
+  async moveFolder(bucket: R2Bucket, slug: string, oldPath: string, newPath: string): Promise<void> {
+    await storage.copyAll(bucket, `${slug}/${oldPath}`, `${slug}/${newPath}`)
+    await storage.deleteAll(bucket, `${slug}/${oldPath}`)
+
+    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
+    if (structure) {
+      structure.folders = structure.folders.map(f =>
+        f.path === oldPath
+          ? { ...f, path: newPath, name: newPath.split('/').pop() ?? f.name }
+          : f.path.startsWith(`${oldPath}/`)
+            ? { ...f, path: f.path.replace(oldPath, newPath) }
+            : f
+      )
+      structure.files = structure.files.map(f =>
+        f.path.startsWith(`${oldPath}/`)
+          ? { ...f, path: f.path.replace(oldPath, newPath) }
+          : f
+      )
+      await storage.putJson(bucket, `${slug}/index.json`, structure)
+    }
+  },
+
+  /**
    * ファイル削除
    * - R2(SCD_CONTENTS): {slug}/{path} を削除
+   * - R2(SCD_CONTENTS): index.jsonからも削除
    */
   async deleteFile(bucket: R2Bucket, slug: string, path: string): Promise<void> {
     await storage.delete(bucket, `${slug}/${path}`)
+
+    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
+    if (structure) {
+      structure.files = structure.files.filter(f => f.path !== path)
+      await storage.putJson(bucket, `${slug}/index.json`, structure)
+    }
   },
 
   /**

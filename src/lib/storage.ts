@@ -74,4 +74,17 @@ export const storage = {
     const result = await bucket.list({ prefix })
     await Promise.all(result.objects.map(obj => bucket.delete(obj.key)))
   },
+
+  /**
+   * プレフィックス配下を全コピー
+   */
+  async copyAll(bucket: R2Bucket, oldPrefix: string, newPrefix: string): Promise<void> {
+    const result = await bucket.list({ prefix: oldPrefix })
+    await Promise.all(result.objects.map(async obj => {
+      const content = await bucket.get(obj.key)
+      if (!content) return
+      const newKey = obj.key.replace(oldPrefix, newPrefix)
+      await bucket.put(newKey, await content.arrayBuffer())
+    }))
+  },
 }
