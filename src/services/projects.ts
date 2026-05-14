@@ -127,8 +127,8 @@ export const projectService = {
    * プロジェクト更新
    * - D1: projects をUPDATE
    * - D1: project_tags を一括更新（tagIdsがある場合）
-   * - R2(SCD_CONTENTS): README.md をPUT（contentがある場合）
-   * - R2(SCD_CONTENTS): slug変更時にsimpleはREADME.mdのみ移動、docsは配下を全移動
+   * - R2(SCD_CONTENTS): {slug}/README.md をPUT（contentがある場合）
+   * - R2(SCD_CONTENTS): slug変更時にsimpleは{slug}/README.mdのみ移動、docsは{slug}/配下を全移動
    */
   async update(db: D1Database, bucket: R2Bucket, slug: string, data: UpdateProjectInput): Promise<void> {
     const project = await projectRepository.getBySlug(db, slug)
@@ -136,23 +136,21 @@ export const projectService = {
 
     const newSlug = data.slug ?? slug
 
-    // slug変更時にR2のファイルを移動
     if (data.slug && data.slug !== slug) {
       if (project.type === 'simple') {
-        // README.mdのみ移動
+        // README.mdのみ新slugパスに移動
         const oldReadme = await storage.getText(bucket, `${slug}/README.md`)
         if (oldReadme) {
           await storage.putText(bucket, `${newSlug}/README.md`, oldReadme)
           await storage.delete(bucket, `${slug}/README.md`)
         }
       } else {
-        // docs：配下を全コピー→全削除
+        // docs：{slug}/配下を全コピー後、旧{slug}/配下を全削除
         await storage.copyAll(bucket, `${slug}/`, `${newSlug}/`)
         await storage.deleteAll(bucket, `${slug}/`)
       }
     }
 
-    // contentが更新された場合
     if (data.content) {
       await storage.putText(bucket, `${newSlug}/README.md`, data.content)
     }
@@ -168,7 +166,7 @@ export const projectService = {
   /**
    * プロジェクト削除
    * - D1: projects をDELETE（project_tagsはCASCADE）
-   * - R2(SCD_CONTENTS): {slug}/ 配下を全削除
+   * - R2(SCD_CONTENTS): {slug}/配下を全削除
    */
   async delete(db: D1Database, bucket: R2Bucket, slug: string): Promise<void> {
     const project = await projectRepository.getBySlug(db, slug)
@@ -179,7 +177,7 @@ export const projectService = {
   },
 
   /**
-   * フォルダ構造更新
+   * フォルダ構造更新（index.json丸ごと置き換え）
    * - R2(SCD_CONTENTS): {slug}/index.json をPUT
    */
   async updateFolders(bucket: R2Bucket, slug: string, data: FolderStructure): Promise<void> {
@@ -187,17 +185,64 @@ export const projectService = {
   },
 
   /**
+   * フォルダ作成
+   * - R2(SCD_CONTENTS): {slug}/index.json のfoldersに追記
+   */
+  async createFolder(bucket: R2Bucket, slug: string, folderPath: string): Promise<void> {
+    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
+    if (!structure) throw new NotFoundError()
+
+    const name = folderPath.split('/').pop() ?? folderPath
+    const order = structure.folders.length
+
+    structure.folders.push({ name, path: folderPath, order })
+    await storage.putJson(bucket, `${slug}/index.json`, structure)
+  },
+
+  /**
+   * フォルダ削除
+   * - R2(SCD_CONTENTS): {slug}/{folderPath}/配下を全削除
+   * - R2(SCD_CONTENTS): {slug}/index.json のfoldersとfilesから該当パスを削除
+   */
+  async deleteFolder(bucket: R2Bucket, slug: string, folderPath: string): Promise<void> {
+    await storage.deleteAll(bucket, `${slug}/${folderPath}/`)
+
+    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
+    if (structure) {
+      structure.folders = structure.folders.filter(f =>
+        f.path !== folderPath && !f.path.startsWith(`${folderPath}/`)
+      )
+      structure.files = structure.files.filter(f =>
+        !f.path.startsWith(`${folderPath}/`)
+      )
+      await storage.putJson(bucket, `${slug}/index.json`, structure)
+    }
+  },
+
+  /**
    * ファイルアップロード
    * - R2(SCD_CONTENTS): {slug}/{path} にMDをPUT
+   * - R2(SCD_CONTENTS): {slug}/index.json のfilesに追記
    */
   async uploadFile(bucket: R2Bucket, slug: string, path: string, content: string): Promise<void> {
     await storage.putText(bucket, `${slug}/${path}`, content)
+
+    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
+    if (structure) {
+      const name = path.split('/').pop() ?? path
+      const order = structure.files.length
+      const exists = structure.files.some(f => f.path === path)
+      if (!exists) {
+        structure.files.push({ name, path, order })
+        await storage.putJson(bucket, `${slug}/index.json`, structure)
+      }
+    }
   },
 
   /**
    * ファイル移動
-   * - R2(SCD_CONTENTS): 旧パスをコピー→削除
-   * - R2(SCD_CONTENTS): index.jsonのpath更新
+   * - R2(SCD_CONTENTS): {slug}/{oldPath} を{slug}/{newPath}にコピー後、{slug}/{oldPath}を削除
+   * - R2(SCD_CONTENTS): {slug}/index.json のfilesのpathを更新
    */
   async moveFile(bucket: R2Bucket, slug: string, oldPath: string, newPath: string): Promise<void> {
     const content = await storage.getText(bucket, `${slug}/${oldPath}`)
@@ -219,8 +264,8 @@ export const projectService = {
 
   /**
    * フォルダ移動
-   * - R2(SCD_CONTENTS): 旧プレフィックス配下を全コピー→全削除
-   * - R2(SCD_CONTENTS): index.jsonのフォルダ・ファイルのpath更新
+   * - R2(SCD_CONTENTS): {slug}/{oldPath}/配下を{slug}/{newPath}/に全コピー後、{slug}/{oldPath}/配下を全削除
+   * - R2(SCD_CONTENTS): {slug}/index.json のfoldersとfilesのpathを更新
    */
   async moveFolder(bucket: R2Bucket, slug: string, oldPath: string, newPath: string): Promise<void> {
     await storage.copyAll(bucket, `${slug}/${oldPath}`, `${slug}/${newPath}`)
@@ -247,7 +292,7 @@ export const projectService = {
   /**
    * ファイル削除
    * - R2(SCD_CONTENTS): {slug}/{path} を削除
-   * - R2(SCD_CONTENTS): index.jsonからも削除
+   * - R2(SCD_CONTENTS): {slug}/index.json のfilesから該当pathを削除
    */
   async deleteFile(bucket: R2Bucket, slug: string, path: string): Promise<void> {
     await storage.delete(bucket, `${slug}/${path}`)

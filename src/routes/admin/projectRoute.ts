@@ -40,12 +40,21 @@ adminProjectRoute.delete('/:slug', async (c) => {
   return c.json({ success: true })
 })
 
-// フォルダ構造更新
+// フォルダ構造更新（index.json丸ごと置き換え）
 adminProjectRoute.put('/:slug/folders', async (c) => {
   const slug = c.req.param('slug')
   const body = await c.req.json<FolderStructure>()
   await projectService.updateFolders(c.env.SCD_CONTENTS, slug, body)
   return c.json({ success: true })
+})
+
+// フォルダ作成
+adminProjectRoute.post('/:slug/folders/*', async (c) => {
+  const slug = c.req.param('slug')
+  const folderPath = c.req.param('*')
+  if (!folderPath) throw new NotFoundError()
+  await projectService.createFolder(c.env.SCD_CONTENTS, slug, folderPath)
+  return c.json({ success: true }, 201)
 })
 
 // フォルダ移動
@@ -55,6 +64,15 @@ adminProjectRoute.patch('/:slug/folders/*', async (c) => {
   if (!oldPath) throw new NotFoundError()
   const body = await c.req.json<{ new_path: string }>()
   await projectService.moveFolder(c.env.SCD_CONTENTS, slug, oldPath, body.new_path)
+  return c.json({ success: true })
+})
+
+// フォルダ削除
+adminProjectRoute.delete('/:slug/folders/*', async (c) => {
+  const slug = c.req.param('slug')
+  const folderPath = c.req.param('*')
+  if (!folderPath) throw new NotFoundError()
+  await projectService.deleteFolder(c.env.SCD_CONTENTS, slug, folderPath)
   return c.json({ success: true })
 })
 
