@@ -1,3 +1,5 @@
+// src/services/projects.ts
+
 import { projectRepository } from '../repositories/projects'
 import { storage } from '../lib/storage'
 import { NotFoundError, AppError } from '../lib/errors'
@@ -49,13 +51,13 @@ export const projectService = {
   /**
    * プロジェクト個別取得
    * - D1: projects + tags をJOIN
-   * - R2(SCD_CONTENTS): {slug}/README.md を取得
+   * - R2(SCD_CONTENTS): {id}/README.md を取得
    */
   async getBySlug(db: D1Database, bucket: R2Bucket, slug: string, includeDeleted = false) {
     const project = await projectRepository.getBySlug(db, slug, includeDeleted)
     if (!project) return null
 
-    const readme = await storage.getText(bucket, `${slug}/README.md`)
+    const readme = await storage.getText(bucket, `${project.id}/README.md`)
 
     return { ...project, readme }
   },
@@ -67,9 +69,9 @@ export const projectService = {
   /**
    * プロジェクト作成
    * - D1: slugの重複チェック
-   * - D1: projects にINSERT
+   * - D1: projects にINSERT（has_index: 0）
    * - D1: project_tags にINSERT（tagIdsがある場合）
-   * - R2(SCD_CONTENTS): {slug}/README.md をPUT（contentがある場合）
+   * - R2(SCD_CONTENTS): {id}/README.md をPUT（contentがある場合）
    */
   async create(db: D1Database, bucket: R2Bucket, data: CreateProjectInput): Promise<{ id: string }> {
     const exists = await projectRepository.existsBySlug(db, data.slug)
@@ -77,10 +79,6 @@ export const projectService = {
 
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
-
-    if (data.content) {
-      await storage.putText(bucket, `${data.slug}/README.md`, data.content)
-    }
 
     await projectRepository.create(db, {
       id,
@@ -95,6 +93,10 @@ export const projectService = {
       status: data.status ?? 'draft',
     })
 
+    if (data.content) {
+      await storage.putText(bucket, `${id}/README.md`, data.content)
+    }
+
     if (data.tagIds && data.tagIds.length > 0) {
       await projectRepository.setTags(db, id, data.tagIds)
     }
@@ -107,8 +109,8 @@ export const projectService = {
    * - D1: slug変更時に重複チェック
    * - D1: projects を差分UPDATE
    * - D1: project_tags を一括更新（tagIdsがある場合）
-   * - R2(SCD_CONTENTS): README.md をPUT（contentがある場合）
-   * - R2(SCD_CONTENTS): slug変更時に{slug}/README.mdを移動
+   * - R2(SCD_CONTENTS): {id}/README.md をPUT（contentがある場合）
+   * - slug変更時はD1のslugのみ更新・R2のパスはidで固定のため移動不要
    */
   async update(db: D1Database, bucket: R2Bucket, slug: string, data: UpdateProjectInput): Promise<void> {
     const project = await projectRepository.getBySlug(db, slug)
@@ -117,18 +119,10 @@ export const projectService = {
     if (data.slug && data.slug !== slug) {
       const exists = await projectRepository.existsBySlug(db, data.slug, project.id)
       if (exists) throw new AppError('slug already exists', 409)
-
-      const oldReadme = await storage.getText(bucket, `${slug}/README.md`)
-      if (oldReadme) {
-        await storage.putText(bucket, `${data.slug}/README.md`, oldReadme)
-        await storage.delete(bucket, `${slug}/README.md`)
-      }
     }
 
-    const newSlug = data.slug ?? slug
-
     if (data.content) {
-      await storage.putText(bucket, `${newSlug}/README.md`, data.content)
+      await storage.putText(bucket, `${project.id}/README.md`, data.content)
     }
 
     const { content, tagIds, ...rest } = data
