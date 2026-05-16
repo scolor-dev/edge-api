@@ -15,6 +15,10 @@ export interface Tag {
   updated_at: string
 }
 
+export interface TagWithCategory extends Tag {
+  category_name: string | null
+}
+
 export const tagCategoryRepository = {
   /**
    * カテゴリー一覧取得
@@ -32,37 +36,39 @@ export const tagCategoryRepository = {
    * - tag_categories にINSERT
    */
   async create(db: D1Database, data: Omit<TagCategory, 'created_at' | 'updated_at'>): Promise<void> {
+    const now = new Date().toISOString()
     await db
       .prepare('INSERT INTO tag_categories (id, name, slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(data.id, data.name, data.slug, new Date().toISOString(), new Date().toISOString())
+      .bind(data.id, data.name, data.slug, now, now)
       .run()
   },
 
   /**
    * カテゴリー更新
    * - tag_categories をUPDATE
+   * - name・slugは必須（Partialではなく全フィールド必須）
    */
-  async update(db: D1Database, id: string, data: Partial<Pick<TagCategory, 'name' | 'slug'>>): Promise<void> {
+  async update(db: D1Database, id: string, data: Pick<TagCategory, 'name' | 'slug'>): Promise<void> {
+    const now = new Date().toISOString()
     await db
       .prepare('UPDATE tag_categories SET name = ?, slug = ?, updated_at = ? WHERE id = ?')
-      .bind(data.name, data.slug, new Date().toISOString(), id)
+      .bind(data.name, data.slug, now, id)
       .run()
   },
 
   /**
    * カテゴリー削除
-   * - 配下タグのcategory_idをNULLに更新
-   * - tag_categories をDELETE
+   * - batchで原子的に実行
+   * - 配下タグのcategory_idをNULLに更新してからDELETE
    */
   async delete(db: D1Database, id: string): Promise<void> {
-    await db
-      .prepare('UPDATE tags SET category_id = NULL, updated_at = ? WHERE category_id = ?')
-      .bind(new Date().toISOString(), id)
-      .run()
-    await db
-      .prepare('DELETE FROM tag_categories WHERE id = ?')
-      .bind(id)
-      .run()
+    const now = new Date().toISOString()
+    await db.batch([
+      db.prepare('UPDATE tags SET category_id = NULL, updated_at = ? WHERE category_id = ?')
+        .bind(now, id),
+      db.prepare('DELETE FROM tag_categories WHERE id = ?')
+        .bind(id),
+    ])
   },
 }
 
@@ -70,8 +76,9 @@ export const tagRepository = {
   /**
    * タグ一覧取得
    * - tags + tag_categories をJOIN
+   * - category_nameも含むTagWithCategoryを返す
    */
-  async getAll(db: D1Database): Promise<Tag[]> {
+  async getAll(db: D1Database): Promise<TagWithCategory[]> {
     const { results } = await db
       .prepare(`
         SELECT t.*, tc.name as category_name
@@ -80,7 +87,7 @@ export const tagRepository = {
         ORDER BY t.name
       `)
       .all()
-    return results as unknown as Tag[]
+    return results as unknown as TagWithCategory[]
   },
 
   /**
@@ -111,26 +118,42 @@ export const tagRepository = {
    * - tags にINSERT
    */
   async create(db: D1Database, data: Omit<Tag, 'created_at' | 'updated_at'>): Promise<void> {
+    const now = new Date().toISOString()
     await db
       .prepare('INSERT INTO tags (id, category_id, name, slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(data.id, data.category_id, data.name, data.slug, new Date().toISOString(), new Date().toISOString())
+      .bind(data.id, data.category_id, data.name, data.slug, now, now)
       .run()
   },
 
   /**
-   * タグ更新（名前・カテゴリー変更）
-   * - tags をUPDATE
+   * タグ更新
+   * - name・slugは必須
+   * - category_idはundefined=変更なし / null=カテゴリー解除 / string=変更
    */
-  async update(db: D1Database, id: string, data: Partial<Pick<Tag, 'name' | 'slug' | 'category_id'>>): Promise<void> {
-    await db
-      .prepare('UPDATE tags SET name = ?, slug = ?, category_id = ?, updated_at = ? WHERE id = ?')
-      .bind(data.name, data.slug, data.category_id, new Date().toISOString(), id)
-      .run()
+  async update(
+    db: D1Database,
+    id: string,
+    data: Pick<Tag, 'name' | 'slug'> & { category_id?: string | null }
+  ): Promise<void> {
+    const now = new Date().toISOString()
+    if (data.category_id === undefined) {
+      // category_idは変更しない
+      await db
+        .prepare('UPDATE tags SET name = ?, slug = ?, updated_at = ? WHERE id = ?')
+        .bind(data.name, data.slug, now, id)
+        .run()
+    } else {
+      // category_idも更新（nullでカテゴリー解除）
+      await db
+        .prepare('UPDATE tags SET name = ?, slug = ?, category_id = ?, updated_at = ? WHERE id = ?')
+        .bind(data.name, data.slug, data.category_id, now, id)
+        .run()
+    }
   },
 
   /**
    * タグ削除
-   * - tags をDELETE（project_tags・note_tags・blog_tagsはCASCADEで削除）
+   * - tags をDELETE（project_tagsはCASCADEで削除）
    */
   async delete(db: D1Database, id: string): Promise<void> {
     await db

@@ -1,5 +1,3 @@
-// src/services/tags.ts
-
 import { tagRepository, tagCategoryRepository } from '../repositories/tags'
 import { NotFoundError } from '../lib/errors'
 
@@ -8,15 +6,17 @@ export interface CreateTagCategoryInput {
   slug: string
 }
 
-export interface UpdateTagCategoryInput extends Partial<CreateTagCategoryInput> {}
-
 export interface CreateTagInput {
   name: string
   slug: string
   category_id?: string
 }
 
-export interface UpdateTagInput extends Partial<CreateTagInput> {}
+export interface UpdateTagInput {
+  name: string
+  slug: string
+  category_id?: string | null  // undefined=変更なし / null=解除 / string=変更
+}
 
 export const tagCategoryService = {
   /**
@@ -38,10 +38,10 @@ export const tagCategoryService = {
   },
 
   /**
-   * カテゴリー更新
+   * カテゴリー更新（name・slug両フィールド必須）
    * - D1: tag_categories をUPDATE
    */
-  async update(db: D1Database, id: string, data: UpdateTagCategoryInput): Promise<void> {
+  async update(db: D1Database, id: string, data: CreateTagCategoryInput): Promise<void> {
     await tagCategoryRepository.update(db, id, data)
   },
 
@@ -85,6 +85,8 @@ export const tagService = {
 
   /**
    * タグ更新
+   * - name・slugは必須
+   * - category_id: undefined=変更なし / null=カテゴリー解除 / string=カテゴリー変更
    * - D1: tags をUPDATE
    */
   async update(db: D1Database, id: string, data: UpdateTagInput): Promise<void> {
@@ -95,7 +97,7 @@ export const tagService = {
 
   /**
    * タグ削除
-   * - D1: tags をDELETE（project_tags・note_tags・blog_tagsはCASCADE）
+   * - D1: tags をDELETE（project_tagsはCASCADEで削除）
    */
   async delete(db: D1Database, id: string): Promise<void> {
     await tagRepository.delete(db, id)

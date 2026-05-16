@@ -1,6 +1,6 @@
 import { projectRepository } from '../repositories/projects'
 import { storage } from '../lib/storage'
-import { NotFoundError } from '../lib/errors'
+import { NotFoundError, AppError } from '../lib/errors'
 
 export interface ProjectQuery {
   q?: string
@@ -10,12 +10,13 @@ export interface ProjectQuery {
   date_from?: string
   date_to?: string
   status?: 'published' | 'draft' | 'private' | 'archived'
+  deleted?: 'true' | 'false' | 'all'
 }
 
 export interface CreateProjectInput {
-  type: 'simple' | 'docs'
   title: string
   slug: string
+  thumbnail?: string
   description?: string
   links?: string
   keywords?: string
@@ -27,11 +28,6 @@ export interface CreateProjectInput {
 
 export interface UpdateProjectInput extends Partial<CreateProjectInput> {}
 
-export interface FolderStructure {
-  folders: { name: string; path: string; order: number }[]
-  files: { name: string; path: string; order: number }[]
-}
-
 export const projectService = {
   // ===========================
   // public
@@ -40,45 +36,28 @@ export const projectService = {
   /**
    * プロジェクト一覧取得
    * - D1: projects + tags をJOIN・クエリ絞り込み
+   * - publicは published・deleted=false のみ
    */
   async getAll(db: D1Database, query: ProjectQuery) {
-    return await projectRepository.getAll(db, query)
+    return await projectRepository.getAll(db, {
+      ...query,
+      status: query.status ?? 'published',
+      deleted: query.deleted ?? 'false',
+    })
   },
 
   /**
    * プロジェクト個別取得
    * - D1: projects + tags をJOIN
    * - R2(SCD_CONTENTS): {slug}/README.md を取得
-   * - R2(SCD_CONTENTS): {slug}/index.json を取得（type === 'docs'のみ）
    */
-  async getBySlug(db: D1Database, bucket: R2Bucket, slug: string) {
-    const project = await projectRepository.getBySlug(db, slug)
+  async getBySlug(db: D1Database, bucket: R2Bucket, slug: string, includeDeleted = false) {
+    const project = await projectRepository.getBySlug(db, slug, includeDeleted)
     if (!project) return null
 
     const readme = await storage.getText(bucket, `${slug}/README.md`)
 
-    let folders = null
-    if (project.type === 'docs') {
-      folders = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-    }
-
-    return { ...project, readme, folders }
-  },
-
-  /**
-   * フォルダ構造取得
-   * - R2(SCD_CONTENTS): {slug}/index.json を取得してパース
-   */
-  async getFolders(bucket: R2Bucket, slug: string) {
-    return await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-  },
-
-  /**
-   * ファイル取得
-   * - R2(SCD_CONTENTS): {slug}/{path} のMDを取得
-   */
-  async getFile(bucket: R2Bucket, slug: string, path: string) {
-    return await storage.getText(bucket, `${slug}/${path}`)
+    return { ...project, readme }
   },
 
   // ===========================
@@ -87,12 +66,15 @@ export const projectService = {
 
   /**
    * プロジェクト作成
+   * - D1: slugの重複チェック
    * - D1: projects にINSERT
    * - D1: project_tags にINSERT（tagIdsがある場合）
    * - R2(SCD_CONTENTS): {slug}/README.md をPUT（contentがある場合）
-   * - R2(SCD_CONTENTS): {slug}/index.json をPUT（type === 'docs'の場合）
    */
   async create(db: D1Database, bucket: R2Bucket, data: CreateProjectInput): Promise<{ id: string }> {
+    const exists = await projectRepository.existsBySlug(db, data.slug)
+    if (exists) throw new AppError('slug already exists', 409)
+
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
 
@@ -100,15 +82,12 @@ export const projectService = {
       await storage.putText(bucket, `${data.slug}/README.md`, data.content)
     }
 
-    if (data.type === 'docs') {
-      await storage.putJson(bucket, `${data.slug}/index.json`, { folders: [], files: [] })
-    }
-
     await projectRepository.create(db, {
       id,
-      type: data.type,
+      has_index: 0,
       title: data.title,
       slug: data.slug,
+      thumbnail: data.thumbnail ?? null,
       description: data.description ?? null,
       links: data.links ?? null,
       keywords: data.keywords ?? null,
@@ -124,39 +103,36 @@ export const projectService = {
   },
 
   /**
-   * プロジェクト更新
-   * - D1: projects をUPDATE
+   * プロジェクト更新（PATCH）
+   * - D1: slug変更時に重複チェック
+   * - D1: projects を差分UPDATE
    * - D1: project_tags を一括更新（tagIdsがある場合）
-   * - R2(SCD_CONTENTS): {slug}/README.md をPUT（contentがある場合）
-   * - R2(SCD_CONTENTS): slug変更時にsimpleは{slug}/README.mdのみ移動、docsは{slug}/配下を全移動
+   * - R2(SCD_CONTENTS): README.md をPUT（contentがある場合）
+   * - R2(SCD_CONTENTS): slug変更時に{slug}/README.mdを移動
    */
   async update(db: D1Database, bucket: R2Bucket, slug: string, data: UpdateProjectInput): Promise<void> {
     const project = await projectRepository.getBySlug(db, slug)
     if (!project) throw new NotFoundError()
 
-    const newSlug = data.slug ?? slug
-
     if (data.slug && data.slug !== slug) {
-      if (project.type === 'simple') {
-        // README.mdのみ新slugパスに移動
-        const oldReadme = await storage.getText(bucket, `${slug}/README.md`)
-        if (oldReadme) {
-          await storage.putText(bucket, `${newSlug}/README.md`, oldReadme)
-          await storage.delete(bucket, `${slug}/README.md`)
-        }
-      } else {
-        // docs：{slug}/配下を全コピー後、旧{slug}/配下を全削除
-        await storage.copyAll(bucket, `${slug}/`, `${newSlug}/`)
-        await storage.deleteAll(bucket, `${slug}/`)
+      const exists = await projectRepository.existsBySlug(db, data.slug, project.id)
+      if (exists) throw new AppError('slug already exists', 409)
+
+      const oldReadme = await storage.getText(bucket, `${slug}/README.md`)
+      if (oldReadme) {
+        await storage.putText(bucket, `${data.slug}/README.md`, oldReadme)
+        await storage.delete(bucket, `${slug}/README.md`)
       }
     }
+
+    const newSlug = data.slug ?? slug
 
     if (data.content) {
       await storage.putText(bucket, `${newSlug}/README.md`, data.content)
     }
 
     const { content, tagIds, ...rest } = data
-    await projectRepository.update(db, project.id, rest)
+    await projectRepository.patch(db, project.id, rest)
 
     if (tagIds) {
       await projectRepository.setTags(db, project.id, tagIds)
@@ -164,173 +140,14 @@ export const projectService = {
   },
 
   /**
-   * プロジェクト削除
-   * - D1: projects をDELETE（project_tagsはCASCADE）
-   * - R2(SCD_CONTENTS): {slug}/配下を全削除
+   * プロジェクト削除（論理削除）
+   * - D1: deleted_atをセット・delete_afterに30日後をセット
+   * - R2は削除しない（delete_after到達後にCron Triggersで物理削除）
    */
-  async delete(db: D1Database, bucket: R2Bucket, slug: string): Promise<void> {
+  async delete(db: D1Database, slug: string): Promise<void> {
     const project = await projectRepository.getBySlug(db, slug)
     if (!project) throw new NotFoundError()
 
-    await projectRepository.delete(db, project.id)
-    await storage.deleteAll(bucket, `${slug}/`)
-  },
-
-  /**
-   * フォルダ構造更新（index.json丸ごと置き換え）
-   * - R2(SCD_CONTENTS): {slug}/index.json をPUT
-   */
-  async updateFolders(bucket: R2Bucket, slug: string, data: FolderStructure): Promise<void> {
-    await storage.putJson(bucket, `${slug}/index.json`, data)
-  },
-
-  /**
-   * フォルダ作成
-   * - R2(SCD_CONTENTS): {slug}/index.json のfoldersに追記
-   */
-  async createFolder(bucket: R2Bucket, slug: string, folderPath: string): Promise<void> {
-    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-    if (!structure) throw new NotFoundError()
-
-    const name = folderPath.split('/').pop() ?? folderPath
-    const order = structure.folders.length
-
-    structure.folders.push({ name, path: folderPath, order })
-    await storage.putJson(bucket, `${slug}/index.json`, structure)
-  },
-
-  /**
-   * フォルダ削除
-   * - R2(SCD_CONTENTS): {slug}/{folderPath}/配下を全削除
-   * - R2(SCD_CONTENTS): {slug}/index.json のfoldersとfilesから該当パスを削除
-   */
-  async deleteFolder(bucket: R2Bucket, slug: string, folderPath: string): Promise<void> {
-    await storage.deleteAll(bucket, `${slug}/${folderPath}/`)
-
-    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-    if (structure) {
-      structure.folders = structure.folders.filter(f =>
-        f.path !== folderPath && !f.path.startsWith(`${folderPath}/`)
-      )
-      structure.files = structure.files.filter(f =>
-        !f.path.startsWith(`${folderPath}/`)
-      )
-      await storage.putJson(bucket, `${slug}/index.json`, structure)
-    }
-  },
-
-  /**
-   * ファイルアップロード
-   * - R2(SCD_CONTENTS): {slug}/{path} にMDをPUT
-   * - R2(SCD_CONTENTS): {slug}/index.json のfilesに追記
-   */
-  async uploadFile(bucket: R2Bucket, slug: string, path: string, content: string): Promise<void> {
-    await storage.putText(bucket, `${slug}/${path}`, content)
-
-    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-    if (structure) {
-      const name = path.split('/').pop() ?? path
-      const order = structure.files.length
-      const exists = structure.files.some(f => f.path === path)
-      if (!exists) {
-        structure.files.push({ name, path, order })
-        await storage.putJson(bucket, `${slug}/index.json`, structure)
-      }
-    }
-  },
-
-  /**
-   * ファイル移動
-   * - R2(SCD_CONTENTS): {slug}/{oldPath} を{slug}/{newPath}にコピー後、{slug}/{oldPath}を削除
-   * - R2(SCD_CONTENTS): {slug}/index.json のfilesのpathを更新
-   */
-  async moveFile(bucket: R2Bucket, slug: string, oldPath: string, newPath: string): Promise<void> {
-    const content = await storage.getText(bucket, `${slug}/${oldPath}`)
-    if (!content) throw new NotFoundError()
-
-    await storage.putText(bucket, `${slug}/${newPath}`, content)
-    await storage.delete(bucket, `${slug}/${oldPath}`)
-
-    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-    if (structure) {
-      structure.files = structure.files.map(f =>
-        f.path === oldPath
-          ? { ...f, path: newPath, name: newPath.split('/').pop() ?? f.name }
-          : f
-      )
-      await storage.putJson(bucket, `${slug}/index.json`, structure)
-    }
-  },
-
-  /**
-   * フォルダ移動
-   * - R2(SCD_CONTENTS): {slug}/{oldPath}/配下を{slug}/{newPath}/に全コピー後、{slug}/{oldPath}/配下を全削除
-   * - R2(SCD_CONTENTS): {slug}/index.json のfoldersとfilesのpathを更新
-   */
-  async moveFolder(bucket: R2Bucket, slug: string, oldPath: string, newPath: string): Promise<void> {
-    await storage.copyAll(bucket, `${slug}/${oldPath}`, `${slug}/${newPath}`)
-    await storage.deleteAll(bucket, `${slug}/${oldPath}`)
-
-    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-    if (structure) {
-      structure.folders = structure.folders.map(f =>
-        f.path === oldPath
-          ? { ...f, path: newPath, name: newPath.split('/').pop() ?? f.name }
-          : f.path.startsWith(`${oldPath}/`)
-            ? { ...f, path: f.path.replace(oldPath, newPath) }
-            : f
-      )
-      structure.files = structure.files.map(f =>
-        f.path.startsWith(`${oldPath}/`)
-          ? { ...f, path: f.path.replace(oldPath, newPath) }
-          : f
-      )
-      await storage.putJson(bucket, `${slug}/index.json`, structure)
-    }
-  },
-
-  /**
-   * ファイル削除
-   * - R2(SCD_CONTENTS): {slug}/{path} を削除
-   * - R2(SCD_CONTENTS): {slug}/index.json のfilesから該当pathを削除
-   */
-  async deleteFile(bucket: R2Bucket, slug: string, path: string): Promise<void> {
-    await storage.delete(bucket, `${slug}/${path}`)
-
-    const structure = await storage.getJson<FolderStructure>(bucket, `${slug}/index.json`)
-    if (structure) {
-      structure.files = structure.files.filter(f => f.path !== path)
-      await storage.putJson(bucket, `${slug}/index.json`, structure)
-    }
-  },
-
-  /**
-   * タグ一括更新
-   * - D1: project_tags を全DELETE後にINSERT
-   */
-  async setTags(db: D1Database, slug: string, tagIds: string[]): Promise<void> {
-    const project = await projectRepository.getBySlug(db, slug)
-    if (!project) throw new NotFoundError()
-    await projectRepository.setTags(db, project.id, tagIds)
-  },
-
-  /**
-   * タグ個別追加
-   * - D1: project_tags にINSERT
-   */
-  async addTag(db: D1Database, slug: string, tagId: string): Promise<void> {
-    const project = await projectRepository.getBySlug(db, slug)
-    if (!project) throw new NotFoundError()
-    await projectRepository.addTag(db, project.id, tagId)
-  },
-
-  /**
-   * タグ個別削除
-   * - D1: project_tags をDELETE
-   */
-  async removeTag(db: D1Database, slug: string, tagId: string): Promise<void> {
-    const project = await projectRepository.getBySlug(db, slug)
-    if (!project) throw new NotFoundError()
-    await projectRepository.removeTag(db, project.id, tagId)
+    await projectRepository.softDelete(db, project.id)
   },
 }

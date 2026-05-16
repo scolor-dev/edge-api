@@ -10,28 +10,10 @@ projectRoute.get('/', async (c) => {
   return c.json(await projectService.getAll(c.env.SCD_DB, query))
 })
 
-// プロジェクト個別（README.md + index.json）
+// プロジェクト個別（README.md + メタ情報）
 projectRoute.get('/:slug', async (c) => {
   const slug = c.req.param('slug')
   const result = await projectService.getBySlug(c.env.SCD_DB, c.env.SCD_CONTENTS, slug)
-  if (!result) throw new NotFoundError()
-  return c.json(result)
-})
-
-// フォルダ構造取得
-projectRoute.get('/:slug/folders', async (c) => {
-  const slug = c.req.param('slug')
-  const result = await projectService.getFolders(c.env.SCD_CONTENTS, slug)
-  if (!result) throw new NotFoundError()
-  return c.json(result)
-})
-
-// ファイル取得
-projectRoute.get('/:slug/files/*', async (c) => {
-  const slug = c.req.param('slug')
-  const path = c.req.param('*')
-  if (!path) throw new NotFoundError()
-  const result = await projectService.getFile(c.env.SCD_CONTENTS, slug, path)
   if (!result) throw new NotFoundError()
   return c.json(result)
 })
