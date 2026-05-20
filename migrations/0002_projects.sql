@@ -5,6 +5,7 @@ CREATE TABLE projects (
   slug         TEXT NOT NULL UNIQUE,
   thumbnail    TEXT,
   description  TEXT,
+  body         TEXT,
   links        TEXT,
   keywords     TEXT,
   date         TEXT,

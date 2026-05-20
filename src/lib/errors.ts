@@ -1,29 +1,29 @@
-import type { ContentfulStatusCode } from 'hono/utils/http-status'
+import type { ContentfulStatusCode } from "hono/utils/http-status"
 
 export class AppError extends Error {
-  constructor(
-    message: string,
-    public status: ContentfulStatusCode = 500,
-    public cause?: unknown
-  ) {
-    super(message)
+	constructor(
+		message: string,
+		public status: ContentfulStatusCode = 500,
+		public cause?: unknown,
+	) {
+		super(message)
 
-    this.name = 'AppError'
-  }
+		this.name = "AppError"
+	}
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized') {
-    super(message, 401)
+	constructor(message = "Unauthorized") {
+		super(message, 401)
 
-    this.name = 'UnauthorizedError'
-  }
+		this.name = "UnauthorizedError"
+	}
 }
 
 export class NotFoundError extends AppError {
-  constructor(message = 'Not Found') {
-    super(message, 404)
+	constructor(message = "Not Found") {
+		super(message, 404)
 
-    this.name = 'NotFoundError'
-  }
+		this.name = "NotFoundError"
+	}
 }
