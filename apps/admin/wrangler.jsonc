@@ -5,5 +5,8 @@
 	"compatibility_flags": [
 		"nodejs_als"
 	],
-	"pages_build_output_dir": ".svelte-kit/cloudflare"
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+	"vars": {
+		"API_BASE_URL": "https://portfolio-api.sorairo-root.workers.dev/api"
+	}
 }
