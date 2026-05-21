@@ -1,0 +1,37 @@
+{
+	"name": "@portfolio/api",
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy --minify",
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+
+		"lint": "biome check .",
+		"format": "biome format --write .",
+		"check": "biome check --write .",
+
+		"r2:list": "wrangler r2 bucket list",
+		"r2:create": "wrangler r2 bucket create",
+		"r2:delete": "wrangler r2 bucket delete",
+
+		"d1:list": "wrangler d1 list",
+		"d1:create": "wrangler d1 create",
+		"d1:migrate": "wrangler d1 migrations apply",
+		"d1:query": "wrangler d1 execute",
+		"d1:delete": "wrangler d1 delete",
+
+		"kv:list": "wrangler kv namespace list",
+		"kv:create": "wrangler kv namespace create",
+		"kv:put": "wrangler kv key put",
+		"kv:get": "wrangler kv key get",
+		"kv:delete": "wrangler kv key delete"
+	},
+	"dependencies": {
+		"hono": "^4.12.18"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.14",
+		"@cloudflare/workers-types": "^4.20260509.1",
+		"wrangler": "^4.4.0"
+	}
+}
