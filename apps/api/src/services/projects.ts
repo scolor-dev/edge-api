@@ -89,6 +89,13 @@ export const projectService = {
 		})
 	},
 
+	async adminGetAll(db: D1Database, query: ProjectQuery) {
+		return await projectRepository.getAll(db, {
+			...query,
+			deleted: query.deleted ?? "false",
+		})
+	},
+
 	/**
 	 * プロジェクト個別取得
 	 * - D1: projects + tags をJOIN
@@ -239,6 +246,65 @@ export const projectService = {
 		if (tagIds !== undefined) {
 			await projectRepository.setTags(db, project.id, tagIds)
 		}
+	},
+
+	/**
+	 * フォルダ更新
+	 * - R2: index.json の folders エントリを更新
+	 */
+	async updateFolder(
+		db: D1Database,
+		bucket: R2Bucket,
+		slug: string,
+		folderPath: string,
+		data: { title?: string; description?: string },
+	): Promise<void> {
+		const project = await projectRepository.getBySlug(db, slug)
+		if (!project) throw new NotFoundError()
+		if (!project.has_index) throw new NotFoundError()
+
+		const index = await storage.getJson<IndexJson>(bucket, r2.index(project.id))
+		if (!index) throw new NotFoundError()
+
+		const existing = index.folders[folderPath]
+		if (!existing) throw new NotFoundError()
+
+		await storage.putJson(bucket, r2.index(project.id), {
+			...index,
+			folders: {
+				...index.folders,
+				[folderPath]: {
+					...existing,
+					...(data.title !== undefined && { title: data.title }),
+					...(data.description !== undefined && { description: data.description }),
+				},
+			},
+		})
+	},
+
+	/**
+	 * フォルダ削除
+	 * - R2: index.json の folders からエントリを削除
+	 */
+	async deleteFolder(
+		db: D1Database,
+		bucket: R2Bucket,
+		slug: string,
+		folderPath: string,
+	): Promise<void> {
+		const project = await projectRepository.getBySlug(db, slug)
+		if (!project) throw new NotFoundError()
+		if (!project.has_index) throw new NotFoundError()
+
+		const index = await storage.getJson<IndexJson>(bucket, r2.index(project.id))
+		if (!index) throw new NotFoundError()
+
+		const { [folderPath]: _, ...remainingFolders } = index.folders
+
+		await storage.putJson(bucket, r2.index(project.id), {
+			...index,
+			folders: remainingFolders,
+		})
 	},
 
 	/**

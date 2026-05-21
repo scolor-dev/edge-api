@@ -1,7 +1,11 @@
 import { Hono } from "hono"
+import { ConflictError } from "../../lib/errors"
 import { tagCategoryService, tagService } from "../../services/tags"
 
 const adminTagRoute = new Hono<{ Bindings: CloudflareBindings }>()
+
+const isUniqueError = (err: unknown) =>
+	err instanceof Error && err.message.includes("UNIQUE constraint failed")
 
 // =========================================================
 // Tags
@@ -22,8 +26,13 @@ adminTagRoute.post("/", async (c) => {
 		slug: string
 		category_id?: string
 	}>()
-	const result = await tagService.create(c.env.SCD_DB, { name, slug, category_id })
-	return c.json(result, 201)
+	try {
+		const result = await tagService.create(c.env.SCD_DB, { name, slug, category_id })
+		return c.json(result, 201)
+	} catch (err) {
+		if (isUniqueError(err)) throw new ConflictError(`Slug "${slug}" is already in use`)
+		throw err
+	}
 })
 
 // タグ編集
@@ -34,8 +43,13 @@ adminTagRoute.patch("/:id", async (c) => {
 		slug: string
 		category_id?: string | null
 	}>()
-	await tagService.update(c.env.SCD_DB, id, { name, slug, category_id })
-	return c.json({ success: true })
+	try {
+		await tagService.update(c.env.SCD_DB, id, { name, slug, category_id })
+		return c.json({ success: true })
+	} catch (err) {
+		if (isUniqueError(err)) throw new ConflictError(`Slug "${slug}" is already in use`)
+		throw err
+	}
 })
 
 // タグ削除
@@ -57,16 +71,26 @@ adminTagRoute.get("/categories", async (c) => {
 // カテゴリ作成
 adminTagRoute.post("/categories", async (c) => {
 	const { name, slug } = await c.req.json<{ name: string; slug: string }>()
-	const result = await tagCategoryService.create(c.env.SCD_DB, { name, slug })
-	return c.json(result, 201)
+	try {
+		const result = await tagCategoryService.create(c.env.SCD_DB, { name, slug })
+		return c.json(result, 201)
+	} catch (err) {
+		if (isUniqueError(err)) throw new ConflictError(`Slug "${slug}" is already in use`)
+		throw err
+	}
 })
 
 // カテゴリ編集
 adminTagRoute.patch("/categories/:id", async (c) => {
 	const id = c.req.param("id")
 	const { name, slug } = await c.req.json<{ name: string; slug: string }>()
-	await tagCategoryService.update(c.env.SCD_DB, id, { name, slug })
-	return c.json({ success: true })
+	try {
+		await tagCategoryService.update(c.env.SCD_DB, id, { name, slug })
+		return c.json({ success: true })
+	} catch (err) {
+		if (isUniqueError(err)) throw new ConflictError(`Slug "${slug}" is already in use`)
+		throw err
+	}
 })
 
 // カテゴリ削除（配下タグの category_id は NULL に）

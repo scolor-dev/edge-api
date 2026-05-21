@@ -7,7 +7,7 @@ const adminPostRoute = new Hono<{ Bindings: CloudflareBindings }>()
 // ブログ一覧（admin は status・deleted 絞り込み可）
 adminPostRoute.get("/", async (c) => {
 	const query = parsePostQuery(c)
-	return c.json(await postService.getAll(c.env.SCD_DB, query))
+	return c.json(await postService.adminGetAll(c.env.SCD_DB, query))
 })
 
 // ブログ新規作成

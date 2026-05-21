@@ -62,6 +62,13 @@ export const postService = {
 		})
 	},
 
+	async adminGetAll(db: D1Database, query: PostQuery) {
+		return await postRepository.getAll(db, {
+			...query,
+			deleted: query.deleted ?? "false",
+		})
+	},
+
 	/**
 	 * ブログ個別取得
 	 * - D1: posts + tags をJOIN

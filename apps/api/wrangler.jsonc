@@ -17,7 +17,8 @@
 		{
 			"binding": "SCD_DB",
 			"database_name": "scd-db",
-			"database_id": "d9d81f78-3283-4cca-bb65-9561cc92e20f"
+			"database_id": "d9d81f78-3283-4cca-bb65-9561cc92e20f",
+			"migrations_dir": "../../migrations"
 		}
 	],
 	"observability": {

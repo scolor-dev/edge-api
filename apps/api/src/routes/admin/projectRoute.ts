@@ -7,7 +7,7 @@ const adminProjectRoute = new Hono<{ Bindings: CloudflareBindings }>()
 // プロジェクト一覧（admin は status・deleted 絞り込み可）
 adminProjectRoute.get("/", async (c) => {
 	const query = parseProjectQuery(c)
-	return c.json(await projectService.getAll(c.env.SCD_DB, query))
+	return c.json(await projectService.adminGetAll(c.env.SCD_DB, query))
 })
 
 // プロジェクト作成
@@ -37,6 +37,23 @@ adminProjectRoute.patch("/:slug", async (c) => {
 adminProjectRoute.delete("/:slug", async (c) => {
 	const slug = c.req.param("slug")
 	await projectService.delete(c.env.SCD_DB, slug)
+	return c.json({ success: true })
+})
+
+// フォルダ更新（/:slug/:fileId より先に登録して競合回避）
+adminProjectRoute.patch("/:slug/folder", async (c) => {
+	const slug = c.req.param("slug")
+	const body = await c.req.json<{ path: string; title?: string; description?: string }>()
+	await projectService.updateFolder(c.env.SCD_DB, c.env.SCD_CONTENTS, slug, body.path, body)
+	return c.json({ success: true })
+})
+
+// フォルダ削除
+adminProjectRoute.delete("/:slug/folder", async (c) => {
+	const slug = c.req.param("slug")
+	const path = c.req.query("path")
+	if (!path) return c.json({ error: "path required" }, 400)
+	await projectService.deleteFolder(c.env.SCD_DB, c.env.SCD_CONTENTS, slug, path)
 	return c.json({ success: true })
 })
 

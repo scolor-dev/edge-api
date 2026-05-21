@@ -16,7 +16,8 @@
 
 		"d1:list": "wrangler d1 list",
 		"d1:create": "wrangler d1 create",
-		"d1:migrate": "wrangler d1 migrations apply",
+		"d1:migrate": "wrangler d1 migrations apply scd-db",
+		"d1:migrate:local": "wrangler d1 migrations apply scd-db --local",
 		"d1:query": "wrangler d1 execute",
 		"d1:delete": "wrangler d1 delete",
 
