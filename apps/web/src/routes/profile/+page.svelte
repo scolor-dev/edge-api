@@ -71,11 +71,11 @@
 		</div>
 	</div>
 
-	<div class="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-14 flex flex-col gap-16">
+	<div class="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-16 flex flex-col gap-20">
 
 		<!-- Info cards -->
 		<section>
-			<div class="flex items-center gap-3 mb-6">
+			<div class="flex items-center gap-3 mb-8">
 				<div class="w-1 h-6 rounded-full bg-sky-400"></div>
 				<h2 class="text-xl sm:text-2xl font-bold text-gray-900">About</h2>
 			</div>
@@ -89,20 +89,24 @@
 
 		<!-- Timeline -->
 		<section>
-			<div class="flex items-center gap-3 mb-8">
+			<div class="flex items-center gap-3 mb-10">
 				<div class="w-1 h-6 rounded-full bg-sky-400"></div>
 				<h2 class="text-xl sm:text-2xl font-bold text-gray-900">Timeline</h2>
 			</div>
-			<div class="relative pl-6 flex flex-col gap-0">
-				<!-- Vertical line -->
-				<div class="absolute left-0 top-2 bottom-2 w-px bg-gray-100"></div>
+			<div class="flex flex-col">
 				{#each timeline as item, i}
-					<div class="relative flex gap-5 pb-8 last:pb-0">
-						<!-- Dot -->
-						<div class="absolute -left-[23px] top-1.5 w-3 h-3 rounded-full border-2 border-sky-300 bg-white"></div>
-						<div class="flex flex-col gap-0.5">
-							<span class="text-[11px] tabular-nums text-sky-400 font-medium">{item.year}</span>
-							<p class="text-sm text-gray-700">{item.label}</p>
+					<div class="flex gap-5">
+						<!-- Dot + line column -->
+						<div class="flex flex-col items-center flex-shrink-0 w-5">
+							<div class="w-3 h-3 rounded-full border-2 border-sky-300 bg-white flex-shrink-0 mt-0.5"></div>
+							{#if i < timeline.length - 1}
+								<div class="w-px flex-1 bg-gray-100 my-1.5"></div>
+							{/if}
+						</div>
+						<!-- Content -->
+						<div class="pb-8 last:pb-0 flex flex-col gap-0.5">
+							<span class="text-xs tabular-nums text-sky-400 font-medium">{item.year}</span>
+							<p class="text-sm text-gray-700 leading-relaxed">{item.label}</p>
 						</div>
 					</div>
 				{/each}
