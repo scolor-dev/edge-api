@@ -1,50 +1,9 @@
 import { error, fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
-import type { TagItem } from "../new/+page.server"
 import { apiHeaders, getBase } from "$lib/server/api"
+import type { IndexJson, ProjectDetail, TagItem } from "$lib/types"
 
-type Tag = { id: string; name: string; slug: string }
-type Status = "published" | "draft" | "private" | "archived"
-
-type IndexFileEntry = {
-	title: string
-	uuid: string
-	description?: string
-	date?: string
-	tags: string[]
-}
-
-type IndexFolderEntry = {
-	title: string
-	description?: string
-	date?: string
-	tags: string[]
-}
-
-export type IndexJson = {
-	files: Record<string, IndexFileEntry>
-	folders: Record<string, IndexFolderEntry>
-	siblings: Record<string, { label: string; description?: string }>
-}
-
-export type ProjectDetail = {
-	id: string
-	title: string
-	slug: string
-	status: Status
-	date: string | null
-	description: string | null
-	body: string | null
-	links: string | null
-	keywords: string | null
-	readme: string | null
-	index: IndexJson | null
-	has_index: 0 | 1
-	deleted_at: string | null
-	created_at: string
-	updated_at: string
-	tags: Tag[]
-}
+export type { IndexJson, ProjectDetail }
 
 export const load: PageServerLoad = async ({ platform, params, locals }) => {
 	const base = getBase(platform)
@@ -71,8 +30,8 @@ export const actions: Actions = {
 		let siblings: IndexJson["siblings"] | undefined
 		try {
 			if (siblingsRaw) siblings = JSON.parse(siblingsRaw)
-		} catch {
-			// ignore malformed JSON
+		} catch (e) {
+			console.error("Failed to parse siblings JSON:", e)
 		}
 
 		const body = {

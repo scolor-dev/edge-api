@@ -1,33 +1,16 @@
 import { error, fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
 import { apiHeaders, getBase } from "$lib/server/api"
+import type { IndexJson, ProjectDetail, SelectedFile } from "$lib/types"
 
-type IndexJson = {
-	files: Record<string, { title: string; uuid: string; description?: string; date?: string; tags: string[] }>
-	folders: Record<string, { title: string; description?: string; date?: string; tags: string[] }>
-	siblings: Record<string, { label: string; description?: string }>
-}
-
-type Project = {
-	id: string
-	title: string
-	slug: string
-	has_index: 0 | 1
-	index: IndexJson | null
-}
-
-type SelectedFile = {
-	path: string
-	meta: { title: string; uuid: string; description?: string; date?: string; tags: string[] }
-	content: string | null
-}
+type DocsProject = Pick<ProjectDetail, "id" | "title" | "slug" | "has_index" | "index">
 
 export const load: PageServerLoad = async ({ platform, params, url, locals }) => {
 	const base = getBase(platform)
 
 	const project = await fetch(`${base}/admin/projects/${params.slug}`, { headers: apiHeaders(locals) }).then((r) => {
 		if (r.status === 404) error(404, "Project not found")
-		return r.json() as Promise<Project>
+		return r.json() as Promise<DocsProject>
 	})
 
 	if (!project.has_index) redirect(303, `/projects/${params.slug}`)
@@ -103,9 +86,9 @@ export const actions: Actions = {
 		const base = getBase(platform)
 		const data = await request.formData()
 
-		const body = {
+		const body: Pick<IndexJson["folders"][string], "title"> & { path: string } = {
 			path: data.get("folderPath") as string,
-			title: (data.get("title") as string) || undefined,
+			title: (data.get("title") as string) || "",
 		}
 
 		const res = await fetch(`${base}/admin/projects/${params.slug}/folder`, {

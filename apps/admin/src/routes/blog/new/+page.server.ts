@@ -1,7 +1,7 @@
 import { fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
-import type { TagItem } from "../../projects/new/+page.server"
 import { apiHeaders, getBase } from "$lib/server/api"
+import type { TagItem } from "$lib/types"
 
 export const load: PageServerLoad = async ({ platform, locals }) => {
 	const base = getBase(platform)

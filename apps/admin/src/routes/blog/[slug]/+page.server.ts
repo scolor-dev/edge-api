@@ -1,28 +1,9 @@
 import { error, fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
-import type { TagItem } from "../../projects/new/+page.server"
 import { apiHeaders, getBase } from "$lib/server/api"
+import type { PostDetail, TagItem } from "$lib/types"
 
-type Tag = { id: string; name: string; slug: string }
-type Status = "published" | "draft" | "private" | "archived"
-
-export type PostDetail = {
-	id: string
-	title: string
-	slug: string
-	status: Status
-	date: string | null
-	thumbnail: string | null
-	description: string | null
-	body: string | null
-	keywords: string | null
-	readme: string | null
-	has_index: 0 | 1
-	deleted_at: string | null
-	created_at: string
-	updated_at: string
-	tags: Tag[]
-}
+export type { PostDetail }
 
 export const load: PageServerLoad = async ({ platform, params, locals }) => {
 	const base = getBase(platform)

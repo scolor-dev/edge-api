@@ -1,14 +1,9 @@
 import { fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
 import { apiHeaders, getBase } from "$lib/server/api"
+import type { IndexJson, TagItem } from "$lib/types"
 
-export type TagItem = {
-	id: string
-	name: string
-	slug: string
-	category_id: string | null
-	category_name: string | null
-}
+export type { TagItem }
 
 export const load: PageServerLoad = async ({ platform, locals }) => {
 	const base = getBase(platform)
@@ -26,14 +21,14 @@ export const actions: Actions = {
 		const initDocs = data.get("initDocs") === "on"
 
 		const siblingsRaw = data.get("siblings") as string | null
-		let siblings: Record<string, { label: string; description?: string }> | undefined
+		let siblings: IndexJson["siblings"] | undefined
 		try {
 			if (siblingsRaw) {
 				const parsed = JSON.parse(siblingsRaw)
 				if (Object.keys(parsed).length > 0) siblings = parsed
 			}
-		} catch {
-			// ignore malformed JSON
+		} catch (e) {
+			console.error("Failed to parse siblings JSON:", e)
 		}
 
 		const body = {

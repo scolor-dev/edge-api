@@ -1,15 +1,13 @@
 import { fail } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
 import { apiHeaders, getBase } from "$lib/server/api"
-
-type Category = { id: string; name: string; slug: string }
-type Tag = { id: string; name: string; slug: string; category_id: string | null; category_name: string | null }
+import type { Category, TagItem } from "$lib/types"
 
 export const load: PageServerLoad = async ({ platform, locals }) => {
 	const base = getBase(platform)
 	const [categories, tags] = await Promise.all([
 		fetch(`${base}/admin/tags/categories`, { headers: apiHeaders(locals) }).then((r) => r.json() as Promise<Category[]>),
-		fetch(`${base}/admin/tags`, { headers: apiHeaders(locals) }).then((r) => r.json() as Promise<Tag[]>),
+		fetch(`${base}/admin/tags`, { headers: apiHeaders(locals) }).then((r) => r.json() as Promise<TagItem[]>),
 	])
 	return { categories, tags }
 }

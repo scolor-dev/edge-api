@@ -297,11 +297,11 @@ export const projectRepository = {
 	 * - D1: projects をUPDATE（論理削除済みは対象外）
 	 */
 	async patch(db: D1Database, id: string, data: Partial<ProjectMutableFields>): Promise<void> {
-		const entries = Object.entries(data).filter(([_, v]) => v !== undefined)
+		const entries = Object.entries(data).filter(([, v]) => v !== undefined)
 		if (entries.length === 0) return
 
 		const setClause = entries.map(([k]) => `${k} = ?`).join(", ")
-		const bindings = [...entries.map(([_, v]) => v), new Date().toISOString(), id]
+		const bindings = [...entries.map(([, v]) => v), new Date().toISOString(), id]
 
 		await db
 			.prepare(`
