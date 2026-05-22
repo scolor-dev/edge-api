@@ -66,15 +66,15 @@
 				{#each data.projects as project}
 					<a
 						href="/projects/{project.slug}"
-						class="group relative flex flex-col gap-4 p-6 rounded-2xl bg-white shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+						class="group relative flex flex-col gap-4 p-6 rounded-2xl bg-white border border-gray-100 hover:border-sky-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-sky-100/40 transition-all duration-200 overflow-hidden"
 					>
-						<!-- Top accent line -->
-						<div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-300 via-sky-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+						<!-- Top accent line (always visible, brightens on hover) -->
+						<div class="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl bg-gradient-to-r from-sky-300 to-sky-100 opacity-30 group-hover:opacity-100 transition-opacity duration-200"></div>
 
 						<!-- Header -->
-						<div class="flex items-start justify-between gap-2">
+						<div class="flex items-start justify-between gap-2 pt-1">
 							<div class="flex flex-col gap-0.5 min-w-0">
-								<h2 class="text-sm font-semibold text-gray-900 group-hover:text-sky-500 transition-colors duration-150 leading-snug truncate">
+								<h2 class="text-sm font-semibold text-gray-900 group-hover:text-sky-500 transition-colors duration-150 leading-snug">
 									{project.title}
 								</h2>
 								<p class="text-[11px] text-gray-400 tabular-nums">{formatDate(project.date)}</p>
@@ -100,7 +100,7 @@
 							{#if project.tags.length > 0}
 								<div class="flex flex-wrap gap-1">
 									{#each project.tags as tag}
-										<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-medium">
+										<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-medium group-hover:bg-sky-50 group-hover:text-sky-400 transition-colors duration-200">
 											{tag.name}
 										</span>
 									{/each}
