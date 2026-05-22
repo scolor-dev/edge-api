@@ -1,9 +1,6 @@
 import { error, fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
-import { apiHeaders } from "$lib/server/api"
-
-const getBase = (platform: App.Platform | undefined) =>
-	platform?.env?.API_BASE_URL ?? "http://localhost:8787/api"
+import { apiHeaders, getBase } from "$lib/server/api"
 
 type IndexJson = {
 	files: Record<string, { title: string; uuid: string; description?: string; date?: string; tags: string[] }>

@@ -1,10 +1,7 @@
 import { fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
 import type { TagItem } from "../../projects/new/+page.server"
-import { apiHeaders } from "$lib/server/api"
-
-const getBase = (platform: App.Platform | undefined) =>
-	platform?.env?.API_BASE_URL ?? "http://localhost:8787/api"
+import { apiHeaders, getBase } from "$lib/server/api"
 
 export const load: PageServerLoad = async ({ platform, locals }) => {
 	const base = getBase(platform)
