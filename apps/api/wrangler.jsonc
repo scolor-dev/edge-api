@@ -26,6 +26,6 @@
 		"head_sampling_rate": 1
 	},
 	"vars": {
-		"ALLOWED_ORIGIN": "https://scolor-dev.work, https://admin.scolor-dev.work"
+		"ALLOWED_ORIGIN": "https://scolor-dev.work, https://admin.scolor-dev.work, *.portfolio-admin-6bg.pages.dev"
 	}
 }

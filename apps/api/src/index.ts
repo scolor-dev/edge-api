@@ -12,7 +12,11 @@ app.use(
 	cors({
 		origin: (origin, c) => {
 			const allowed = c.env.ALLOWED_ORIGIN.split(",").map((o) => o.trim())
-			return allowed.includes(origin) ? origin : null
+			const ok = allowed.some((pattern) => {
+				if (pattern.startsWith("*.")) return origin.endsWith(pattern.slice(1))
+				return origin === pattern
+			})
+			return ok ? origin : null
 		},
 		allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
 		allowHeaders: ["Content-Type", "Authorization"],
