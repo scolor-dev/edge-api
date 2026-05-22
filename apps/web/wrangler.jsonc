@@ -1,0 +1,12 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "portfolio-web",
+	"compatibility_date": "2026-05-22",
+	"compatibility_flags": [
+		"nodejs_als"
+	],
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+	"vars": {
+		"API_BASE_URL": "https://portfolio-api.sorairo-root.workers.dev/api"
+	}
+}
