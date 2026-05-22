@@ -1,28 +1,15 @@
 import { error } from '@sveltejs/kit'
+import { getBase } from '$lib/server/api'
+import type { ProjectDetail } from '$lib/types'
 import type { PageServerLoad } from './$types'
 
-type Tag = { id: string; name: string; slug: string }
-
-export type ProjectMeta = {
-	id: string
-	title: string
-	slug: string
-	date: string
-	description: string | null
-	links: string | null
-	keywords: string | null
-	has_index: 0 | 1
-	tags: Tag[]
-	readme: string | null
-}
-
 export const load: PageServerLoad = async ({ platform, params }) => {
-	const base = platform?.env?.API_BASE_URL ?? 'http://localhost:8787/api'
+	const base = getBase(platform)
 	const res = await fetch(`${base}/projects/${params.slug}`)
 	if (res.status === 404) throw error(404, 'Not found')
 	if (!res.ok) throw error(500, 'Failed to fetch project')
 
-	const data = await res.json<ProjectMeta & { index: unknown }>()
+	const data: ProjectDetail = await res.json()
 
 	return {
 		id: data.id,
@@ -35,5 +22,5 @@ export const load: PageServerLoad = async ({ platform, params }) => {
 		has_index: data.has_index,
 		tags: data.tags,
 		readme: data.readme,
-	} satisfies ProjectMeta
+	}
 }

@@ -1,21 +1,9 @@
+import { getBase } from '$lib/server/api'
+import type { Project, Tag } from '$lib/types'
 import type { PageServerLoad } from './$types'
 
-type Tag = { id: string; name: string; slug: string }
-
-export type Project = {
-	id: string
-	title: string
-	slug: string
-	date: string
-	description: string | null
-	links: string | null
-	keywords: string | null
-	has_index: 0 | 1
-	tags: Tag[]
-}
-
 export const load: PageServerLoad = async ({ platform, url }) => {
-	const base = platform?.env?.API_BASE_URL ?? 'http://localhost:8787/api'
+	const base = getBase(platform)
 	const tag = url.searchParams.get('tag') ?? undefined
 
 	const query = new URLSearchParams()

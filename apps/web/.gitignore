@@ -1,0 +1,22 @@
+node_modules
+
+# SvelteKit build output
+/.svelte-kit
+/build
+
+# Wrangler
+.wrangler
+
+# Env
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
