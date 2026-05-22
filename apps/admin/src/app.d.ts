@@ -10,7 +10,9 @@ declare global {
 		}
 
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			accessJwt: string
+		}
 		// interface PageData {}
 		// interface PageState {}
 	}

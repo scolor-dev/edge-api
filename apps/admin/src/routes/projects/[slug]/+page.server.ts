@@ -1,6 +1,7 @@
 import { error, fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
 import type { TagItem } from "../new/+page.server"
+import { apiHeaders } from "$lib/server/api"
 
 const getBase = (platform: App.Platform | undefined) =>
 	platform?.env?.API_BASE_URL ?? "http://localhost:8787/api"
@@ -48,20 +49,20 @@ export type ProjectDetail = {
 	tags: Tag[]
 }
 
-export const load: PageServerLoad = async ({ platform, params }) => {
+export const load: PageServerLoad = async ({ platform, params, locals }) => {
 	const base = getBase(platform)
 	const [project, tags] = await Promise.all([
-		fetch(`${base}/admin/projects/${params.slug}`).then((r) => {
+		fetch(`${base}/admin/projects/${params.slug}`, { headers: apiHeaders(locals) }).then((r) => {
 			if (r.status === 404) error(404, "Project not found")
 			return r.json() as Promise<ProjectDetail>
 		}),
-		fetch(`${base}/admin/tags`).then((r) => r.json() as Promise<TagItem[]>),
+		fetch(`${base}/admin/tags`, { headers: apiHeaders(locals) }).then((r) => r.json() as Promise<TagItem[]>),
 	])
 	return { project, tags }
 }
 
 export const actions: Actions = {
-	update: async ({ request, platform, params }) => {
+	update: async ({ request, platform, params, locals }) => {
 		const base = getBase(platform)
 		const data = await request.formData()
 
@@ -94,7 +95,7 @@ export const actions: Actions = {
 
 		const res = await fetch(`${base}/admin/projects/${params.slug}`, {
 			method: "PATCH",
-			headers: { "Content-Type": "application/json" },
+			headers: apiHeaders(locals),
 			body: JSON.stringify(body),
 		})
 
@@ -102,11 +103,10 @@ export const actions: Actions = {
 		if (newSlug !== params.slug) redirect(303, `/projects/${newSlug}`)
 	},
 
-	delete: async ({ platform, params }) => {
+	delete: async ({ platform, params, locals }) => {
 		const base = getBase(platform)
-		const res = await fetch(`${base}/admin/projects/${params.slug}`, { method: "DELETE" })
+		const res = await fetch(`${base}/admin/projects/${params.slug}`, { method: "DELETE", headers: apiHeaders(locals) })
 		if (!res.ok) return fail(res.status, { message: await res.text() })
 		redirect(303, "/projects")
 	},
-
 }

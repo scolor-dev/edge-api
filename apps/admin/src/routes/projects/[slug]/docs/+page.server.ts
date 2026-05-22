@@ -1,5 +1,6 @@
 import { error, fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
+import { apiHeaders } from "$lib/server/api"
 
 const getBase = (platform: App.Platform | undefined) =>
 	platform?.env?.API_BASE_URL ?? "http://localhost:8787/api"
@@ -24,10 +25,10 @@ type SelectedFile = {
 	content: string | null
 }
 
-export const load: PageServerLoad = async ({ platform, params, url }) => {
+export const load: PageServerLoad = async ({ platform, params, url, locals }) => {
 	const base = getBase(platform)
 
-	const project = await fetch(`${base}/admin/projects/${params.slug}`).then((r) => {
+	const project = await fetch(`${base}/admin/projects/${params.slug}`, { headers: apiHeaders(locals) }).then((r) => {
 		if (r.status === 404) error(404, "Project not found")
 		return r.json() as Promise<Project>
 	})
@@ -38,7 +39,7 @@ export const load: PageServerLoad = async ({ platform, params, url }) => {
 	let selectedFile: SelectedFile | null = null
 
 	if (fileId) {
-		const r = await fetch(`${base}/admin/projects/${params.slug}/${fileId}`)
+		const r = await fetch(`${base}/admin/projects/${params.slug}/${fileId}`, { headers: apiHeaders(locals) })
 		if (r.ok) selectedFile = (await r.json()) as SelectedFile
 	}
 
@@ -46,7 +47,7 @@ export const load: PageServerLoad = async ({ platform, params, url }) => {
 }
 
 export const actions: Actions = {
-	addFile: async ({ request, platform, params }) => {
+	addFile: async ({ request, platform, params, locals }) => {
 		const base = getBase(platform)
 		const data = await request.formData()
 
@@ -60,7 +61,7 @@ export const actions: Actions = {
 
 		const res = await fetch(`${base}/admin/projects/${params.slug}`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: apiHeaders(locals),
 			body: JSON.stringify(body),
 		})
 
@@ -69,7 +70,7 @@ export const actions: Actions = {
 		return { uuid: result.uuid }
 	},
 
-	updateFile: async ({ request, platform, params }) => {
+	updateFile: async ({ request, platform, params, locals }) => {
 		const base = getBase(platform)
 		const data = await request.formData()
 		const fileId = data.get("fileId") as string
@@ -81,26 +82,27 @@ export const actions: Actions = {
 
 		const res = await fetch(`${base}/admin/projects/${params.slug}/${fileId}`, {
 			method: "PATCH",
-			headers: { "Content-Type": "application/json" },
+			headers: apiHeaders(locals),
 			body: JSON.stringify(body),
 		})
 
 		if (!res.ok) return fail(res.status, { message: await res.text() })
 	},
 
-	deleteFile: async ({ request, platform, params }) => {
+	deleteFile: async ({ request, platform, params, locals }) => {
 		const base = getBase(platform)
 		const data = await request.formData()
 		const fileId = data.get("fileId") as string
 
 		const res = await fetch(`${base}/admin/projects/${params.slug}/${fileId}`, {
 			method: "DELETE",
+			headers: apiHeaders(locals),
 		})
 
 		if (!res.ok) return fail(res.status, { message: await res.text() })
 	},
 
-	updateFolder: async ({ request, platform, params }) => {
+	updateFolder: async ({ request, platform, params, locals }) => {
 		const base = getBase(platform)
 		const data = await request.formData()
 
@@ -111,21 +113,21 @@ export const actions: Actions = {
 
 		const res = await fetch(`${base}/admin/projects/${params.slug}/folder`, {
 			method: "PATCH",
-			headers: { "Content-Type": "application/json" },
+			headers: apiHeaders(locals),
 			body: JSON.stringify(body),
 		})
 
 		if (!res.ok) return fail(res.status, { message: await res.text() })
 	},
 
-	deleteFolder: async ({ request, platform, params }) => {
+	deleteFolder: async ({ request, platform, params, locals }) => {
 		const base = getBase(platform)
 		const data = await request.formData()
 		const folderPath = data.get("folderPath") as string
 
 		const res = await fetch(
 			`${base}/admin/projects/${params.slug}/folder?path=${encodeURIComponent(folderPath)}`,
-			{ method: "DELETE" },
+			{ method: "DELETE", headers: apiHeaders(locals) },
 		)
 
 		if (!res.ok) return fail(res.status, { message: await res.text() })

@@ -1,18 +1,19 @@
 import { fail, redirect } from "@sveltejs/kit"
 import type { Actions, PageServerLoad } from "./$types"
 import type { TagItem } from "../../projects/new/+page.server"
+import { apiHeaders } from "$lib/server/api"
 
 const getBase = (platform: App.Platform | undefined) =>
 	platform?.env?.API_BASE_URL ?? "http://localhost:8787/api"
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load: PageServerLoad = async ({ platform, locals }) => {
 	const base = getBase(platform)
-	const tags = await fetch(`${base}/admin/tags`).then((r) => r.json() as Promise<TagItem[]>)
+	const tags = await fetch(`${base}/admin/tags`, { headers: apiHeaders(locals) }).then((r) => r.json() as Promise<TagItem[]>)
 	return { tags }
 }
 
 export const actions: Actions = {
-	default: async ({ request, platform }) => {
+	default: async ({ request, platform, locals }) => {
 		const base = getBase(platform)
 		const data = await request.formData()
 
@@ -34,7 +35,7 @@ export const actions: Actions = {
 
 		const res = await fetch(`${base}/admin/posts`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: apiHeaders(locals),
 			body: JSON.stringify(body),
 		})
 
