@@ -7,15 +7,16 @@
 
 <section class="relative w-full min-h-[540px] sm:min-h-[600px] md:min-h-[640px] flex items-center overflow-hidden">
 	<!-- Background -->
-	<div class="absolute inset-0 bg-gradient-to-br from-white to-sky-50">
+	<div class="absolute inset-0 bg-gradient-to-br from-white via-sky-50/50 to-white">
 		<!-- Dot grid -->
 		<div
 			class="absolute inset-0 opacity-40"
 			style="background-image: radial-gradient(circle, #bae6fd 1px, transparent 1px); background-size: 28px 28px;"
 		></div>
 		<!-- Blur orbs -->
-		<div class="absolute -top-20 -right-20 w-72 h-72 bg-sky-200/30 rounded-full blur-3xl"></div>
-		<div class="absolute bottom-0 -left-12 w-56 h-56 bg-sky-100/40 rounded-full blur-3xl"></div>
+		<div class="absolute -top-24 -right-24 w-96 h-96 bg-sky-200/30 rounded-full blur-3xl"></div>
+		<div class="absolute -bottom-12 -left-20 w-80 h-80 bg-sky-100/50 rounded-full blur-3xl"></div>
+		<div class="absolute top-1/2 left-1/3 w-48 h-48 bg-sky-50/60 rounded-full blur-2xl"></div>
 	</div>
 
 	<!-- Content -->
@@ -80,21 +81,32 @@
 				</div>
 			</div>
 
-			<!-- Profile image -->
-			<div class="flex-shrink-0">
-				<div class="w-44 h-44 sm:w-52 sm:h-52 md:w-60 md:h-60 rounded-full overflow-hidden shadow-md ring-4 ring-white">
-					{#if !imgError}
-						<img
-							src="/avatar.svg"
-							alt="scolor"
-							class="w-full h-full object-cover"
-							onerror={() => (imgError = true)}
-						/>
-					{:else}
-						<div class="w-full h-full bg-gradient-to-br from-sky-100 to-sky-200 flex items-center justify-center">
-							<span class="text-5xl sm:text-6xl md:text-7xl font-bold text-sky-400 select-none">S</span>
-						</div>
-					{/if}
+			<!-- Profile image with rotating ring -->
+			<div class="flex-shrink-0 flex items-center justify-center">
+				<div class="relative w-44 h-44 sm:w-52 sm:h-52 md:w-60 md:h-60">
+					<!-- Rotating outer ring with dot -->
+					<div class="absolute inset-0 rounded-full border-2 border-sky-200 animate-[spin_20s_linear_infinite]">
+						<div class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-sky-300 shadow-sm shadow-sky-200"></div>
+					</div>
+					<!-- Slower counter-rotating inner ring -->
+					<div class="absolute inset-3 rounded-full border border-dashed border-sky-100 animate-[spin_35s_linear_infinite_reverse]">
+						<div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-sky-200"></div>
+					</div>
+					<!-- Profile image -->
+					<div class="absolute inset-5 rounded-full overflow-hidden shadow-md ring-4 ring-white">
+						{#if !imgError}
+							<img
+								src="/avatar.svg"
+								alt="scolor"
+								class="w-full h-full object-cover"
+								onerror={() => (imgError = true)}
+							/>
+						{:else}
+							<div class="w-full h-full bg-gradient-to-br from-sky-100 to-sky-200 flex items-center justify-center">
+								<span class="text-4xl sm:text-5xl font-bold text-sky-400 select-none">S</span>
+							</div>
+						{/if}
+					</div>
 				</div>
 			</div>
 
