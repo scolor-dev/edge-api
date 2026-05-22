@@ -22,6 +22,7 @@
 	let toc = $state<TocItem[]>([])
 	let activeId = $state('')
 	let contentEl = $state<HTMLElement | null>(null)
+	const links = $derived(parseLinks(data.links))
 
 	function slugify(text: string) {
 		return text
@@ -130,7 +131,6 @@
 			{/if}
 
 			<!-- Links -->
-			{@const links = parseLinks(data.links)}
 			{#if links.length > 0}
 				<div class="flex flex-wrap gap-3">
 					{#each links as link}
